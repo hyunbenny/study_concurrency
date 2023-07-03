@@ -1,4 +1,4 @@
-package com.hyunbenny.study_concurrency;
+package com.hyunbenny.study_concurrency.domain;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
