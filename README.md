@@ -60,3 +60,41 @@ Stock findByIdWithPessimisticLock(Long id);
 // 마이바티스를 사용한다면 쿼리에 `FOR UPDATE`를 붙여주면 된다.
 SELECT * FROM stock WHERE id = {#id} FOR UPDATE WAIT 10;
 ```
+## 2.2 Optimistic Lock
+> 실제로 `Lock` 을 이용하지 않고 `버전`을 이용함으로써 정합성을 맞추는 방법
+- 먼저 데이터를 읽은 후에 update 를 수행할 때 현재 내가 읽은 버전이 맞는지 확인하며 업데이트 합니다.
+- 버전이 다른 경우에는 application에서 다시 읽은후에 작업을 수행해야 한다.
+- 실제 `Lock`을 잡지 않기 때문에 `Pessimistic Lock`보다 성능상 이점이 있다.
+- update로직이 실패했을 때 재시도 로직을 개발자가 직접 작성해줘야 한다.
+```java
+// 엔티티에 `version`필드를 추가해줘야 한다.
+@Version
+private Long version;
+```
+```java
+@Lock(value = LockModeType.OPTIMISTIC)
+@Query("SELECT s FROM OptimisticLockStock  s WHERE s.id = :id")
+OptimisticLockStock findByIdWithOptimisticLock(Long id);
+```
+```java
+// `Lock`이 걸려 로직에 실패한 경우, 재시도하는 로직을 개발자가 직접 짜줘야 한다.
+@Service
+@RequiredArgsConstructor
+public class OptimisticLockStockServiceFacade {
+
+    private final OptimisticLockStockService optimisticLockStockService;
+
+    public void decrease(long id, long quantity) throws InterruptedException {
+
+        while (true) {
+            try {
+                optimisticLockStockService.decrease(id, quantity);
+                break;
+            } catch (Exception e) {
+                Thread.sleep(50);
+            }
+        }
+    }
+
+}
+```
