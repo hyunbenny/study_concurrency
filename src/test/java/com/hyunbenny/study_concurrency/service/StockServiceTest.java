@@ -1,6 +1,6 @@
 package com.hyunbenny.study_concurrency.service;
 
-import com.hyunbenny.study_concurrency.Stock;
+import com.hyunbenny.study_concurrency.domain.Stock;
 import com.hyunbenny.study_concurrency.repository.StockRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

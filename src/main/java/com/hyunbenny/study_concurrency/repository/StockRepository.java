@@ -1,6 +1,6 @@
 package com.hyunbenny.study_concurrency.repository;
 
-import com.hyunbenny.study_concurrency.Stock;
+import com.hyunbenny.study_concurrency.domain.Stock;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
