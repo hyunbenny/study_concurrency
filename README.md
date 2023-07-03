@@ -98,3 +98,64 @@ public class OptimisticLockStockServiceFacade {
 
 }
 ```
+## 2.3 Named Lock
+> 이름을 가진 `metadata locking`
+- 이름을 가진 lock 을 획득한 후 해제할때까지 다른 세션은 이 lock 을 획득할 수 없도록 합니다.
+- 주로 `분산 락`을 구현할 때 사용한다.
+- timout을 구현하기 힘든 `Pessimistic Lock` 과는 달리 쉽게 구현할 수 있다.
+- 주의: transaction이 종료될 때 lock 이 자동으로 해제되지 않는다
+    - 따라서 별도의 명령어로 `직접 해제` 시켜주거나 `선점시간`이 끝나야 해제된다.
+        - mysql : `get_lock`, `release_lock`
+
+```java
+public interface NamedLockRepository extends JpaRepository<Stock, Long> {
+
+    @Query(value = "SELECT GET_LOCK(:key, 3000)", nativeQuery = true)
+    void getLock(String key);
+
+    @Query(value = "SELECT RELEASE_LOCK(:key)", nativeQuery = true)
+    void releaseLock(String key);
+}
+```
+```java
+@Service
+@RequiredArgsConstructor
+public class NamedLockStockService {
+
+    private final StockRepository stockRepository;
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public synchronized void decrease(Long id, Long quantity) {
+        // get stock entity
+        Stock stock = stockRepository.findById(id).orElseThrow();
+
+        // decrease stock
+        stock.decrease(quantity);
+
+        stockRepository.saveAndFlush(stock);
+    }
+}
+```
+```java
+@Component
+@RequiredArgsConstructor
+public class NamedLockStockServiceFacade {
+
+    private final NamedLockRepository lockRepository;
+
+    private final NamedLockStockService stockService;
+
+    @Transactional
+    public void decrease(Long id, Long quantity) {
+        try {
+            lockRepository.getLock(String.valueOf(id));
+            stockService.decrease(id, quantity);
+        } finally{
+            lockRepository.releaseLock(String.valueOf(id));
+        }
+
+    }
+
+}
+```
+
