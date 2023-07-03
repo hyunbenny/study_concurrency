@@ -65,7 +65,7 @@ SELECT * FROM stock WHERE id = {#id} FOR UPDATE WAIT 10;
 - 먼저 데이터를 읽은 후에 update 를 수행할 때 현재 내가 읽은 버전이 맞는지 확인하며 업데이트 합니다.
 - 버전이 다른 경우에는 application에서 다시 읽은후에 작업을 수행해야 한다.
 - 실제 `Lock`을 잡지 않기 때문에 `Pessimistic Lock`보다 성능상 이점이 있다.
-- update로직이 실패했을 때 재시도 로직을 개발자가 직접 작성해줘야 한다.
+- update로직이 실패했을 때 `retry` 하는 로직을 개발자가 직접 작성해줘야 한다.
 ```java
 // 엔티티에 `version`필드를 추가해줘야 한다.
 @Version
@@ -158,4 +158,93 @@ public class NamedLockStockServiceFacade {
 
 }
 ```
+# 3. Redis
+## 3.1 Lettuce
+> setnx 명령어를 사용한 `분산 락` 구현으로 `spin lock` 방식을 사용한다.
+- [spin lock](https://ko.wikipedia.org/wiki/%EC%8A%A4%ED%95%80%EB%9D%BD) : Lock을 획득하려는 쓰레드가 Lock을 사용할 수 있는지 반복적으로 확인하면서 lock을 획득하는 방식
+    - → 락을 획득할 때까지 `retry` 하는 로직을 개발자가 직접 작성해줘야 한다.
+- 구현이 간단하다는 장점이 있지만, `Spin Lock`방식이기 때문에  `Redis`에 부하를 줄 수 있다.
+```java
+@Component
+@RequiredArgsConstructor
+public class RedisLettuceLockRepository {
 
+    private final RedisTemplate<String, String> redisTemplate;
+
+    public Boolean lock(Long key) {
+        return redisTemplate
+                .opsForValue()
+                .setIfAbsent(generatedKey(key), "lock", Duration.ofMillis(3_000));
+
+    }
+
+    public Boolean unlock(Long key) {
+        return redisTemplate.delete(generatedKey(key));
+    }
+
+    private String generatedKey(Long key) {
+        return String.valueOf(key);
+    }
+}
+```
+```java
+@Component
+@RequiredArgsConstructor
+public class LettuceLockStockServiceFacade {
+
+    private final RedisLettuceLockRepository redisRepository;
+    private final StockService stockService;
+
+    public void decrease(Long id, Long quantity) throws InterruptedException {
+        while (!redisRepository.lock(id)) {
+            Thread.sleep(100); // Redis에 많은 부하가 가는 것을 막기 위해서 `Thread.sleep()`을 통해 부하를 좀 줄여주자.
+        }
+
+        try {
+            stockService.decrease(id, quantity);
+        } finally{
+            redisRepository.unlock(id);
+        }
+
+    }
+}
+```
+## 3.2 Redisson
+> `pub-sub` 방식을 기반으로 락을 구현하여 제공한다.
+- `채널`을 만들고 락을 점유하고 있던 쓰레드의 작업이 끝나면 채널은 획득하기 위해서 대기 중인 쓰레드에게 락의 해제를 알려주고 그러면 대기 중이던 쓰레드가 락을 획득하는 방식
+- `Redisson` 은 `Lock`획득과 관련된 클래스를 제공하기 때문에 개발자가 직접 `리포지토리`를 만들지 않아도 된다.
+- `Lettuce`에 비해서 구현이 조금은 복잡하고 별도 라이브러리를 사용해야 한다는 단점이 존재하지만,
+- `pub-sub` 방식이기 때문에 `Redis` 에 부하를 줄여준다는 장점이 있다.
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class RedissonLockStockServiceFacade {
+
+    private final RedissonClient redissonClient;
+    private final StockService stockService;
+
+    public void decrease(Long id, Long quantity) {
+        RLock lock = redissonClient.getLock(String.valueOf(id));
+
+        try {
+            boolean available = lock.tryLock(5, 1, TimeUnit.SECONDS);
+
+            if (!available){
+                log.info("Lock 획득 실패");
+                return;
+            }
+
+            stockService.decrease(id, quantity);
+
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }finally {
+            lock.unlock();
+        }
+    }
+}
+```
+https://dev.mysql.com/doc/refman/8.0/en/
+https://dev.mysql.com/doc/refman/8.0/en/locking-functions.html
+https://dev.mysql.com/doc/refman/8.0/en/metadata-locking.html
