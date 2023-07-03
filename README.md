@@ -44,7 +44,11 @@ decreaseStock()이 끝나고 endTransaction() 즉, `commit`이 되기 전에 다
 그러면 이를 해결할 수 있는 DB에서 제공하는 `Lock`에 대해서 알아보자
 
 # 2. DB Lock
-> Mysql에서는 아래와 같은 3가지 `Lock`을 제공한다.
+> Mysql에서는 아래와 같은 3가지 `Lock`을 제공한다.<br/>
+
+https://dev.mysql.com/doc/refman/8.0/en/ <br/>
+https://dev.mysql.com/doc/refman/8.0/en/locking-functions.html <br/>
+https://dev.mysql.com/doc/refman/8.0/en/metadata-locking.html <br/>
 
 ## 2.1 Pessimistic Lock
 > 실제 데이터에 `Lock`을 걸어서 정합성을 맞추는 방법
@@ -245,6 +249,4 @@ public class RedissonLockStockServiceFacade {
     }
 }
 ```
-https://dev.mysql.com/doc/refman/8.0/en/
-https://dev.mysql.com/doc/refman/8.0/en/locking-functions.html
-https://dev.mysql.com/doc/refman/8.0/en/metadata-locking.html
+
