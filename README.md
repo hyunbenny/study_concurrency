@@ -42,3 +42,21 @@ decreaseStock()이 끝나고 endTransaction() 즉, `commit`이 되기 전에 다
 이 말은 한 프로세스 안에서만 동시성 이슈가 보장된다는 말이며 즉, 여러 대의 서버를 사용하는 실무 환경에서는 아무런 소용이 없다는 말이다. 
 
 그러면 이를 해결할 수 있는 DB에서 제공하는 `Lock`에 대해서 알아보자
+
+# 2. DB Lock
+> Mysql에서는 아래와 같은 3가지 `Lock`을 제공한다.
+
+## 2.1 Pessimistic Lock
+> 실제 데이터에 `Lock`을 걸어서 정합성을 맞추는 방법
+- exclusive lock 을 걸게되며 다른 트랜잭션에서는 lock 이 해제되기전에 데이터를 가져갈 수 없으므로 데이터 정합성이 보장된다.
+- 충돌이 빈번하게 일어날 수 있는 메서드에서는 `Optimistic Lock` 보다 성능이 좋다.
+- 주의 : 성능의 감소와 `Deadlock`이 걸릴 수 있다.
+
+```java
+@Lock(value = LockModeType.PESSIMISTIC_WRITE)
+@Query("SELECT s FROM Stock  s WHERE s.id = :id")
+Stock findByIdWithPessimisticLock(Long id);
+
+// 마이바티스를 사용한다면 쿼리에 `FOR UPDATE`를 붙여주면 된다.
+SELECT * FROM stock WHERE id = {#id} FOR UPDATE WAIT 10;
+```
