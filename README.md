@@ -32,7 +32,7 @@ endTransaction();
 왜?
 
 `@Transactional`의 동작원리를 다시 보면 이해가 가능하다.
-decreaseStock()이 끝나고 endTransaction() 즉, `commit`이 되기 전에 다른 쓰레드에서 메서드에 접근이 가능하기 때문에 동시성 이슈는 여전히 존재한다.
+decreaseStock()이 끝나고 endTransaction() 즉, `commit`이 되기 전에 다른 서버에서는 메서드에 접근이 가능하기 때문에 동시성 이슈는 여전히 존재한다.
 
 ➡️ 이는 `@Transactional`을 지워주면 해결된다.
 
